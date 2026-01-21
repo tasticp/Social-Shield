@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../lib/theme';
@@ -11,6 +11,28 @@ type HeaderProps = {
 
 export default function Header({ title, subtitle }: HeaderProps) {
   const navigation = useNavigation();
+  const [pressed, setPressed] = useState(false);
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    setPressed(true);
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 100,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    setPressed(false);
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 3,
+      tension: 40,
+    }).start();
+  };
 
   return (
     <View style={styles.container}>
@@ -24,9 +46,21 @@ export default function Header({ title, subtitle }: HeaderProps) {
         accessibilityLabel="Settings"
         accessibilityRole="button"
         onPress={() => navigation.navigate('Settings' as never)}
-        style={styles.button}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.8}
+        style={[
+          styles.button,
+          pressed && styles.buttonPressed
+        ]}
       >
-        <Ionicons name="settings-outline" size={20} color={theme.colors.onSurface} />
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          <Ionicons 
+            name="settings-outline" 
+            size={20} 
+            color={pressed ? theme.colors.primary : theme.colors.onSurface} 
+          />
+        </Animated.View>
       </TouchableOpacity>
     </View>
   );
@@ -59,7 +93,11 @@ const styles = StyleSheet.create({
   },
   button: {
     padding: 8,
-    borderRadius: 8,
+    borderRadius: theme.radii.md,
     backgroundColor: 'transparent',
+    transition: 'all 0.2s ease',
+  },
+  buttonPressed: {
+    backgroundColor: theme.colors.elevatedSurface,
   },
 });

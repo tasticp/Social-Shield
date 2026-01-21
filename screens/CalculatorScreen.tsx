@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   GestureResponderEvent,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '../components/Header';
@@ -137,6 +138,9 @@ function evaluateRPN(tokens: string[]) {
 export default function CalculatorScreen() {
   const [expr, setExpr] = useState<string>('');
   const [result, setResult] = useState<string>('');
+  const [pressedKey, setPressedKey] = useState<string | null>(null);
+  const [history, setHistory] = useState<Array<{expression: string, result: string, timestamp: Date}>>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   const displayResult = useMemo(() => {
     if (result) return result;
@@ -145,6 +149,9 @@ export default function CalculatorScreen() {
   }, [expr, result]);
 
   function handlePress(label: string) {
+    setPressedKey(label);
+    setTimeout(() => setPressedKey(null), 150);
+    
     if (label === 'AC') {
       setExpr('');
       setResult('');
@@ -192,7 +199,17 @@ export default function CalculatorScreen() {
         } else {
           // Format result to reasonable precision
           const formatted = Math.round((val + Number.EPSILON) * 1e12) / 1e12;
-          setResult(String(formatted));
+          const resultStr = String(formatted);
+          setResult(resultStr);
+          
+          // Add to history
+          if (expr && resultStr !== 'Error') {
+            setHistory(prev => [{
+              expression: expr,
+              result: resultStr,
+              timestamp: new Date()
+            }, ...prev.slice(0, 9)]); // Keep last 10 calculations
+          }
         }
       } catch (e) {
         setResult('Error');
@@ -243,10 +260,45 @@ export default function CalculatorScreen() {
       </SafeAreaView>
 
       <View style={styles.body}>
+        {showHistory && history.length > 0 && (
+          <View style={styles.historyPanel}>
+            <View style={styles.historyHeader}>
+              <Text style={styles.historyTitle}>Recent Calculations</Text>
+              <TouchableOpacity onPress={() => setShowHistory(false)} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {history.map((item, index) => (
+              <TouchableOpacity 
+                key={index} 
+                style={styles.historyItem}
+                onPress={() => {
+                  setExpr(item.expression);
+                  setResult(item.result);
+                  setShowHistory(false);
+                }}
+              >
+                <Text style={styles.historyExpression}>{item.expression}</Text>
+                <Text style={styles.historyResult}>= {item.result}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <View style={styles.display}>
-          <Text style={styles.exprText} numberOfLines={1} ellipsizeMode="head">
-            {expr || ' '}
-          </Text>
+          <View style={styles.displayHeader}>
+            <Text style={styles.exprText} numberOfLines={1} ellipsizeMode="head">
+              {expr || ' '}
+            </Text>
+            {history.length > 0 && (
+              <TouchableOpacity 
+                onPress={() => setShowHistory(!showHistory)}
+                style={styles.historyButton}
+              >
+                <Text style={styles.historyButtonText}>📋</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Text style={styles.displayText} numberOfLines={1} ellipsizeMode="tail">
             {displayResult}
           </Text>
@@ -262,16 +314,29 @@ export default function CalculatorScreen() {
                 return (
                   <TouchableOpacity
                     key={label}
-                    activeOpacity={0.7}
+                    activeOpacity={0.8}
                     onPress={(e: GestureResponderEvent) => handlePress(label)}
+                    onPressIn={() => setPressedKey(label)}
+                    onPressOut={() => setTimeout(() => setPressedKey(null), 100)}
                     style={[
                       styles.key,
                       isZero && styles.keyZero,
-                      isOp ? styles.keyOp : null,
-                      isFunc ? styles.keyFunc : null,
+                      isOp ? (pressedKey === label ? styles.keyOpPressed : styles.keyOp) : null,
+                      isFunc ? (pressedKey === label ? styles.keyFuncPressed : styles.keyFunc) : null,
+                      !isOp && !isFunc && pressedKey === label ? styles.keyPressed : null,
                     ]}
-                    accessibilityLabel={`Calculator key ${label}`}>
-                    <Text style={[styles.keyText, isOp ? styles.keyTextOp : null]}>{label}</Text>
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Calculator ${label} key ${isOp ? 'operator' : isFunc ? 'function' : 'number'}`}
+                    accessibilityHint={`Press to ${label === 'AC' ? 'clear all' : label === '=' ? 'calculate result' : `enter ${label}`}`}>
+                    <Text 
+                      style={[
+                        styles.keyText, 
+                        isOp ? styles.keyTextOp : null,
+                        pressedKey === label ? styles.keyTextPressed : null
+                      ]}
+                      accessibilityLiveRegion="polite"
+                    >{label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -351,7 +416,84 @@ const styles = StyleSheet.create({
   keyFunc: {
     backgroundColor: '#0B1416',
   },
+  keyPressed: {
+    backgroundColor: '#152528',
+    transform: [{ scale: 0.95 }],
+  },
+  keyOpPressed: {
+    backgroundColor: '#5AD4A6',
+    transform: [{ scale: 0.95 }],
+  },
+  keyFuncPressed: {
+    backgroundColor: '#0F1E22',
+    transform: [{ scale: 0.95 }],
+  },
   keyTextOp: {
     color: theme.colors.onPrimary,
+  },
+  keyTextPressed: {
+    opacity: 0.8,
+  },
+  historyPanel: {
+    backgroundColor: theme.colors.elevatedSurface,
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderRadius: theme.radii.md,
+    padding: theme.spacing.md,
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: theme.colors.outline,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.outline,
+    paddingBottom: theme.spacing.sm,
+  },
+  historyTitle: {
+    fontSize: theme.type.body,
+    fontWeight: '600',
+    color: theme.colors.onSurface,
+  },
+  closeButton: {
+    padding: theme.spacing.xs,
+    borderRadius: theme.radii.sm,
+    backgroundColor: theme.colors.surfaceVariant,
+  },
+  closeButtonText: {
+    color: theme.colors.onSurfaceMuted,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  historyItem: {
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.outline,
+  },
+  historyExpression: {
+    fontSize: theme.type.caption,
+    color: theme.colors.onSurfaceMuted,
+    marginBottom: 2,
+  },
+  historyResult: {
+    fontSize: theme.type.body,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  displayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  historyButton: {
+    padding: theme.spacing.xs,
+    borderRadius: theme.radii.sm,
+    backgroundColor: 'transparent',
+  },
+  historyButtonText: {
+    fontSize: 18,
   },
 });

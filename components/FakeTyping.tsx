@@ -17,13 +17,33 @@ export default function FakeTyping({ initialText = '' }: Props) {
   const [displayText, setDisplayText] = useState(initialText);
   const [inputText, setInputText] = useState(initialText);
   const [cursorVisible, setCursorVisible] = useState(true);
+  const [isTransforming, setIsTransforming] = useState(false);
   const animBg = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
   const inputRef = useRef<TextInput | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setCursorVisible((v) => !v), 600);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    // Add subtle scale animation when typing
+    if (inputText.length > 0) {
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.02,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [inputText, scaleAnim]);
 
   useEffect(() => {
     // Psychedelic subtle background animation when the mode is psychedelic
@@ -45,21 +65,34 @@ export default function FakeTyping({ initialText = '' }: Props) {
     let typingInterval: NodeJS.Timeout | null = null;
 
     async function runTransform() {
+      setIsTransforming(true);
       try {
         const transformed = await transformTyping(inputText + '\u200B');
         if (cancelled) return;
-        // animate typing the transformed text
-        let idx = 0;
+        
+        // Clear text and add dramatic pause
         setDisplayText('');
-        typingInterval = setInterval(() => {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // animate typing the transformed text with realistic rhythm
+        let idx = 0;
+        const typeChar = () => {
           idx += 1;
           setDisplayText(transformed.slice(0, idx));
-          if (idx >= transformed.length && typingInterval) {
-            clearInterval(typingInterval as NodeJS.Timeout);
+          
+          if (idx < transformed.length) {
+            // Vary typing speed for realism
+            const delay = Math.random() * 60 + 40; // 40-100ms per character
+            typingInterval = setTimeout(typeChar, delay);
+          } else {
+            setIsTransforming(false);
             typingInterval = null;
           }
-        }, 90) as unknown as NodeJS.Timeout;
+        };
+        
+        typingInterval = setTimeout(typeChar, 100) as unknown as NodeJS.Timeout;
       } catch (e) {
+        setIsTransforming(false);
         // fallback to raw input
         setDisplayText(inputText);
       }
@@ -94,14 +127,46 @@ export default function FakeTyping({ initialText = '' }: Props) {
             inputRange: [0, 1],
             outputRange: [theme.colors.surface, '#0A2B2F'],
           }) as unknown as string,
+          transform: [{ scale: scaleAnim }],
         },
       ]}
     >
       {/* Pressing anywhere inside this area will focus the invisible TextInput. */}
-      <Pressable onPress={() => inputRef.current?.focus()} style={styles.inner}>
+      <Pressable 
+        onPress={() => inputRef.current?.focus()} 
+        style={styles.inner}
+        onPressIn={() => {
+          // Subtle feedback when pressing
+          Animated.timing(scaleAnim, {
+            toValue: 0.98,
+            duration: 100,
+            useNativeDriver: true,
+          }).start();
+        }}
+        onPressOut={() => {
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 100,
+            useNativeDriver: true,
+          }).start();
+        }}
+        accessible={true}
+        accessibilityRole="textbox"
+        accessibilityLabel={`Text input field. ${isTransforming ? 'AI is transforming your text' : 'Current text: ' + displayText}`}
+        accessibilityHint="Tap to start typing. In smart mode, AI will transform your text automatically"
+        accessibilityLiveRegion="polite"
+      >
         <Text style={styles.line} numberOfLines={1}>
           {displayText}
-          <Text style={styles.cursor}>{cursorVisible ? '|' : ' '}</Text>
+          <Text style={[
+            styles.cursor,
+            isTransforming && styles.transformingCursor
+          ]}>
+            {cursorVisible ? '|' : ' '}
+          </Text>
+          {isTransforming && (
+            <Text style={styles.transformingIndicator}>✨</Text>
+          )}
         </Text>
 
         {/*
@@ -118,8 +183,8 @@ export default function FakeTyping({ initialText = '' }: Props) {
           autoCapitalize="none"
           caretHidden={false}
           keyboardAppearance="dark"
-          placeholder=""
-          placeholderTextColor="transparent"
+          placeholder="Start typing to transform..."
+          placeholderTextColor={theme.colors.onSurfaceMuted}
           keyboardType="default"
         />
       </Pressable>
@@ -143,6 +208,15 @@ const styles = StyleSheet.create({
   cursor: {
     color: theme.colors.primary,
     fontWeight: '700',
+    fontSize: theme.type.body + 2,
+  },
+  transformingCursor: {
+    color: theme.colors.success,
+  },
+  transformingIndicator: {
+    color: theme.colors.primary,
+    fontSize: 12,
+    marginLeft: 4,
   },
   hiddenInput: {
     position: 'absolute',

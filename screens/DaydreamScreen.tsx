@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.elevatedSurface,
     borderRadius: theme.radii.lg,
     padding: theme.spacing.lg,
     alignItems: 'center',
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 10,
-    elevation: 2,
+    elevation: 3,
   },
   quote: {
     fontSize: theme.type.h1,
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: theme.type.body,
-    color: theme.colors.onSurfaceVariant,
+    color: theme.colors.onSurfaceMuted,
     textAlign: 'center',
   },
 });
