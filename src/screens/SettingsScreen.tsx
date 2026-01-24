@@ -1,13 +1,12 @@
-import React from 'react';
-import { theme } from '../lib/theme';
 import { useModes } from '../hooks/useModes';
+import { theme } from '../lib/theme';
 
 interface SettingsScreenProps {
   onBack: () => void;
 }
 
 export default function SettingsScreen({ onBack }: SettingsScreenProps) {
-  const { modes, toggleMode, isModeEnabled } = useModes();
+  const { modes, toggleMode } = useModes();
 
   return (
     <div style={{

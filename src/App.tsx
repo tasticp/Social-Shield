@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ModesProvider } from './hooks/useModes';
 import { TabNavigation } from './components/TabNavigation';
 import ReadingScreen from './screens/ReadingScreen';
